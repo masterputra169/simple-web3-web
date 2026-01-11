@@ -1,34 +1,27 @@
-import React from 'react';
-import CopyIcon from '../atoms/CopyIcon';
-import CheckIcon from '../atoms/CheckIcon';
+import React, { memo } from 'react';
+import { CopyIcon, CheckIcon } from '../atoms/icons';
 import useCopyToClipboard from '../../hooks/useCopyToClipboard';
 
-const CopyButton = ({ text, size = 16 }) => {
+const CopyButton = ({ text, size = 16, className = '', alwaysVisible = false }) => {
   const { copyToClipboard, isCopied } = useCopyToClipboard();
-
-  const handleCopy = () => {
-    copyToClipboard(text);
-  };
 
   return (
     <button
-      onClick={handleCopy}
-      className="inline-flex items-center justify-center p-1.5 rounded-md hover:bg-gray-100 transition-colors duration-200 group"
+      onClick={() => copyToClipboard(text)}
+      className={`
+        inline-flex items-center justify-center p-1.5 rounded-lg
+        transition-all duration-200
+        hover:bg-white/10 active:scale-95
+      `}
       title={isCopied ? 'Copied!' : 'Copy to clipboard'}
     >
       {isCopied ? (
-        <CheckIcon 
-          size={size} 
-          className="text-green-500" 
-        />
+        <CheckIcon size={size} className="text-green-400" />
       ) : (
-        <CopyIcon 
-          size={size} 
-          className="text-gray-500 group-hover:text-blue-600" 
-        />
+        <CopyIcon size={size} className="text-white/70 hover:text-white" />
       )}
     </button>
   );
 };
 
-export default CopyButton;
+export default memo(CopyButton);

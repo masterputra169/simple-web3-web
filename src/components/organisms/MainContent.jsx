@@ -1,116 +1,102 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import Text from '../atoms/Text';
-import WalletInfo from '../molecules/WalletInfo';
 import Button from '../atoms/Button';
+import WalletCard from './WalletCard';
+import FeatureCard from './FeatureCard';
 import EthPriceDisplay from '../molecules/EthPriceDisplay';
-import useWalletBalance from '../../hooks/useWalletBalance';
+import { WalletIcon } from '../atoms/icons';
+import useWalletBalance, { prefetchBalance } from '../../hooks/useWalletBalance';
 
-// Memoize sub-components
-const WelcomeSection = memo(() => (
+// Hero Section
+const HeroSection = memo(() => (
   <div className="text-center mb-12">
-    <Text variant="h1" className="mb-4">
+    <Text variant="h1" className="mb-4 gradient-text">
       Welcome to Base DApp
     </Text>
-    <Text variant="body" color="muted" className="text-lg">
-      Connect your wallet to interact with Base blockchain
+    <Text variant="body" color="muted" className="text-lg max-w-2xl mx-auto">
+      Connect your wallet to interact with the Base blockchain.
+      Fast, secure, and built for the future.
     </Text>
   </div>
 ));
 
-const ConnectedView = memo(({ walletAddress, balance, isLoading, error, refetch }) => (
-  <div className="space-y-6">
-    <div className="bg-white rounded-xl p-8 shadow-lg">
-      <div className="flex justify-between items-center mb-6">
-        <Text variant="h3">Your Wallet</Text>
-        <Button 
-          onClick={refetch} 
-          variant="outline" 
-          size="sm"
-          disabled={isLoading}
-        >
-          {isLoading ? 'Refreshing...' : '🔄 Refresh'}
-        </Button>
-      </div>
-      
-      <WalletInfo 
-        address={walletAddress} 
-        balance={balance}
-        isLoading={isLoading}
-      />
-      
-      {error && (
-        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <Text variant="small" color="muted">
-            ⚠️ Error: {error}
-          </Text>
-        </div>
-      )}
+// Connected View
+const ConnectedView = memo(({ walletAddress, balance, rawBalance, isLoading, error, refetch }) => (
+  <div className="grid gap-6 lg:grid-cols-2">
+    <WalletCard
+      walletAddress={walletAddress}
+      balance={balance}
+      rawBalance={rawBalance}
+      isLoading={isLoading}
+      error={error}
+      onRefresh={refetch}
+    />
+    <FeatureCard />
+  </div>
+));
 
-      {/* ETH Price Display */}
-      <div className="mt-4">
-        <EthPriceDisplay variant="detailed" />
-      </div>
+// Disconnected View
+const DisconnectedView = memo(({ onConnect }) => (
+  <div className="glass rounded-2xl p-8 md:p-12 text-center max-w-xl mx-auto">
+    {/* Icon */}
+    <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mx-auto mb-6 flex items-center justify-center pulse-glow">
+      <WalletIcon size={40} className="text-white" />
     </div>
 
-    <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-8 shadow-lg text-white">
-      <Text variant="h3" color="white" className="mb-4">
-        Ready to Build
-      </Text>
-      <Text color="white" className="mb-6">
-        Your wallet is connected to Base blockchain. Balance updates automatically every 30 seconds. USD value updates every 60 seconds.
-      </Text>
-      <Button variant="outline" className="bg-white text-blue-600 hover:bg-gray-100">
-        Explore Features
+    {/* Content */}
+    <Text variant="h3" className="mb-4">
+      Connect Your Wallet
+    </Text>
+    <Text color="muted" className="mb-8">
+      To get started, connect your Web3 wallet. We support MetaMask,
+      Coinbase Wallet, and other popular wallets.
+    </Text>
+
+    {/* Connect Button */}
+    <div className="flex justify-center">
+      <Button onClick={onConnect} variant="primary" size="lg" className="w-full sm:w-auto">
+        <WalletIcon size={20} />
+        Connect Wallet
       </Button>
     </div>
-  </div>
-));
 
-const DisconnectedView = memo(() => (
-  <div className="bg-white rounded-xl p-12 shadow-lg text-center">
-    <div className="max-w-md mx-auto">
-      <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full mx-auto mb-6 flex items-center justify-center">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-          <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
-          <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
-          <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
-        </svg>
-      </div>
-      <Text variant="h3" className="mb-4">
-        Connect Your Wallet
-      </Text>
-      <Text color="muted" className="mb-6">
-        To get started, please connect your Web3 wallet using the button in the top right corner.
-      </Text>
-      
-      {/* Show ETH price even when disconnected */}
-      <div className="mt-6 flex justify-center">
-        <EthPriceDisplay variant="compact" />
-      </div>
+    {/* ETH Price - Already loaded */}
+    <div className="mt-8 flex justify-center">
+      <EthPriceDisplay variant="compact" />
     </div>
   </div>
 ));
 
+// Main Content Component
 const MainContent = () => {
-  const { authenticated, user } = usePrivy();
+  const { authenticated, user, login, ready } = usePrivy();
   const walletAddress = user?.wallet?.address;
-  const { balance, isLoading, error, refetch } = useWalletBalance(walletAddress);
+  const { balance, rawBalance, isLoading, error, refetch } = useWalletBalance(walletAddress);
+
+  // Pre-fetch balance saat wallet address tersedia
+  useEffect(() => {
+    if (walletAddress) {
+      prefetchBalance(walletAddress);
+    }
+  }, [walletAddress]);
 
   return (
-    <main className="container mx-auto px-4 py-12">
-      <div className="max-w-4xl mx-auto">
-        <WelcomeSection />
-        {authenticated ? (
-          <ConnectedView 
+    <main className="container mx-auto px-4 py-12 min-h-[calc(100vh-180px)] flex-1">
+      <div className="max-w-5xl mx-auto">
+        <HeroSection />
+        
+        {authenticated && walletAddress ? (
+          <ConnectedView
             walletAddress={walletAddress}
             balance={balance}
+            rawBalance={rawBalance}
             isLoading={isLoading}
             error={error}
             refetch={refetch}
           />
         ) : (
-          <DisconnectedView />
+          <DisconnectedView onConnect={login} />
         )}
       </div>
     </main>

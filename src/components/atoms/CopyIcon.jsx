@@ -1,22 +1,33 @@
-import React from 'react';
+import React, { memo } from 'react';
+import { CopyIcon, CheckIcon } from '../atoms/icons';
+import useCopyToClipboard from '../../hooks/useCopyToClipboard';
 
-const CopyIcon = ({ size = 16, className = '' }) => {
+const CopyButton = ({ text, size = 16, className = '', alwaysVisible = false }) => {
+  const { copyToClipboard, isCopied } = useCopyToClipboard();
+
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
+    <button
+      onClick={() => copyToClipboard(text)}
+      className={`
+        inline-flex items-center justify-center p-1.5 rounded-lg
+        transition-all duration-200
+        hover:bg-white/10 active:scale-95
+        ${alwaysVisible 
+          ? 'opacity-70 hover:opacity-100' 
+          : 'opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100'
+        }
+        ${isCopied ? '!opacity-100' : ''}
+        ${className}
+      `}
+      title={isCopied ? 'Copied!' : 'Copy to clipboard'}
     >
-      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-    </svg>
+      {isCopied ? (
+        <CheckIcon size={size} className="text-green-400" />
+      ) : (
+        <CopyIcon size={size} className="text-white/70 hover:text-white" />
+      )}
+    </button>
   );
 };
 
-export default CopyIcon;
+export default memo(CopyButton);

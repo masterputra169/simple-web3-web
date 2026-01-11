@@ -1,55 +1,123 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useEffect, useRef } from 'react';
 import Text from '../atoms/Text';
+import Spinner from '../atoms/Spinner';
 import useEthPrice from '../../hooks/useEthPrice';
 import { formatUSD } from '../../utils/formatCurrency';
 
-/**
- * Component untuk display current ETH price
- * Optional: bisa ditampilkan di header atau footer
- */
 const EthPriceDisplay = ({ variant = 'compact' }) => {
-  const { ethPrice, isLoading, error } = useEthPrice();
+  const { ethPrice, isLoading, isConnected } = useEthPrice();
+  const [priceFlash, setPriceFlash] = useState(null); // 'up' | 'down' | null
+  const prevPriceRef = useRef(null);
+  const timerRef = useRef(null);
 
-  if (error) return null;
+  // Flash effect saat harga berubah
+  useEffect(() => {
+    // Skip jika tidak ada harga
+    if (ethPrice === null) return;
+    
+    // Skip jika ini harga pertama
+    if (prevPriceRef.current === null) {
+      prevPriceRef.current = ethPrice;
+      return;
+    }
 
+    const priceDiff = ethPrice - prevPriceRef.current;
+    
+    // Update previous price
+    prevPriceRef.current = ethPrice;
+    
+    // Skip jika perubahan terlalu kecil
+    if (Math.abs(priceDiff) < 0.001) return;
+
+    // Clear timer sebelumnya
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
+    // Set flash direction: positif = up (hijau), negatif = down (merah)
+    setPriceFlash(priceDiff > 0 ? 'up' : 'down');
+
+    // Reset flash setelah 500ms
+    timerRef.current = setTimeout(() => {
+      setPriceFlash(null);
+    }, 500);
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [ethPrice]);
+
+  const flashColor = priceFlash === 'up' 
+    ? 'text-green-400' 
+    : priceFlash === 'down' 
+      ? 'text-red-400' 
+      : '';
+
+  // Compact variant
   if (variant === 'compact') {
     return (
-      <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg">
-        <Text variant="tiny" color="muted">
-          ETH:
-        </Text>
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/10">
+        <div className="flex items-center gap-1.5">
+          <div className={`h-1.5 w-1.5 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`} />
+          <Text variant="tiny" color="muted">ETH:</Text>
+        </div>
         {isLoading ? (
-          <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-400 border-t-transparent"></div>
+          <Spinner size="sm" color="white" />
         ) : (
-          <Text variant="tiny" className="font-semibold">
-            {formatUSD(ethPrice)}
-          </Text>
+          <div className="flex items-center gap-1">
+            <Text 
+              variant="tiny" 
+              className={`font-semibold tabular-nums transition-colors duration-150 ${flashColor}`}
+            >
+              {ethPrice ? formatUSD(ethPrice) : '--'}
+            </Text>
+            {priceFlash && (
+              <span className={`text-xs ${flashColor}`}>
+                {priceFlash === 'up' ? '▲' : '▼'}
+              </span>
+            )}
+          </div>
         )}
       </div>
     );
   }
 
+  // Detailed variant
   if (variant === 'detailed') {
     return (
-      <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-3 border border-gray-200">
-        <Text variant="small" color="muted" className="mb-1">
-          Current ETH Price
-        </Text>
-        {isLoading ? (
-          <div className="flex items-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
-            <Text variant="small" color="muted">
-              Loading...
+      <div className="glass rounded-xl p-4">
+        <div className="flex items-center justify-between mb-2">
+          <Text variant="small" color="muted">ETH Price</Text>
+          <div className="flex items-center gap-1.5">
+            <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`} />
+            <Text variant="tiny" color={isConnected ? 'success' : 'warning'}>
+              {isConnected ? 'Live' : 'Offline'}
             </Text>
           </div>
+        </div>
+        
+        {isLoading ? (
+          <div className="flex items-center gap-2">
+            <Spinner size="sm" color="blue" />
+            <Text variant="small" color="muted">Fetching price...</Text>
+          </div>
         ) : (
-          <Text variant="h4" className="font-bold text-gray-900">
-            {formatUSD(ethPrice)}
-          </Text>
+          <div className="flex items-baseline gap-2">
+            <Text 
+              variant="h3" 
+              className={`font-bold tabular-nums transition-colors duration-150 ${flashColor || 'text-blue-400'}`}
+            >
+              {ethPrice ? formatUSD(ethPrice) : '--'}
+            </Text>
+            {priceFlash && (
+              <span className={`text-meds ${flashColor} transition-opacity duration-150`}>
+                {priceFlash === 'up' ? '▲' : '▼'}
+              </span>
+            )}
+          </div>
         )}
-        <Text variant="tiny" color="light" className="mt-1">
-          via CoinGecko • Updates every 60s
-        </Text>
       </div>
     );
   }

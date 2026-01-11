@@ -1,80 +1,64 @@
-/**
- * Format currency utilities
- */
+import { USD_DECIMALS } from './constants';
 
 /**
- * Format USD dengan comma separator dan 2 decimal
+ * Format USD with Intl formatter
  * @param {number|string} amount - Amount in USD
- * @returns {string} - Formatted USD (e.g., "$1,234.56")
+ * @returns {string}
  */
 export const formatUSD = (amount) => {
   if (!amount && amount !== 0) return '$0.00';
-  
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  
   if (isNaN(num)) return '$0.00';
   
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: USD_DECIMALS,
+    maximumFractionDigits: USD_DECIMALS,
   }).format(num);
 };
 
 /**
  * Calculate ETH value in USD
  * @param {number|string} ethBalance - Balance in ETH
- * @param {number|string} ethPrice - Price of 1 ETH in USD
- * @returns {number} - Value in USD
+ * @param {number|string} ethPrice - ETH price in USD
+ * @returns {number}
  */
 export const calculateUSDValue = (ethBalance, ethPrice) => {
   if (!ethBalance || !ethPrice) return 0;
-  
   const balance = typeof ethBalance === 'string' ? parseFloat(ethBalance) : ethBalance;
   const price = typeof ethPrice === 'string' ? parseFloat(ethPrice) : ethPrice;
-  
   if (isNaN(balance) || isNaN(price)) return 0;
-  
   return balance * price;
 };
 
 /**
- * Format ETH balance dengan USD value
+ * Format ETH balance with USD value
  * @param {number|string} ethBalance - Balance in ETH
- * @param {number|string} ethPrice - Price of 1 ETH in USD
- * @returns {Object} - { eth, usd, usdFormatted }
+ * @param {number|string} ethPrice - ETH price in USD
+ * @returns {Object}
  */
 export const formatBalanceWithUSD = (ethBalance, ethPrice) => {
   const usdValue = calculateUSDValue(ethBalance, ethPrice);
-  const usdFormatted = formatUSD(usdValue);
-  
   return {
     eth: ethBalance,
     usd: usdValue,
-    usdFormatted,
+    usdFormatted: formatUSD(usdValue),
   };
 };
 
 /**
  * Shorten large USD numbers
  * @param {number} amount - Amount in USD
- * @returns {string} - Shortened format (e.g., "$1.2K", "$1.5M")
+ * @returns {string}
  */
 export const shortenUSD = (amount) => {
   if (!amount && amount !== 0) return '$0';
+  const abs = Math.abs(amount);
   
-  const absAmount = Math.abs(amount);
-  
-  if (absAmount >= 1e9) {
-    return `$${(amount / 1e9).toFixed(2)}B`;
-  }
-  if (absAmount >= 1e6) {
-    return `$${(amount / 1e6).toFixed(2)}M`;
-  }
-  if (absAmount >= 1e3) {
-    return `$${(amount / 1e3).toFixed(2)}K`;
-  }
+  if (abs >= 1e9) return `$${(amount / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `$${(amount / 1e6).toFixed(2)}M`;
+  if (abs >= 1e3) return `$${(amount / 1e3).toFixed(2)}K`;
   
   return formatUSD(amount);
 };

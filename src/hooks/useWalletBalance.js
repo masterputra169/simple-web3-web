@@ -1,71 +1,130 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { createPublicClient, http, formatEther } from 'viem';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createPublicClient, http, formatEther, webSocket } from 'viem';
 import { base } from 'viem/chains';
 import { formatEthBalance } from '../utils/formatBalance';
+import { BALANCE_REFRESH_INTERVAL, DEFAULT_DECIMALS } from '../utils/constants';
 
+// Create public client dengan multiple transports untuk reliability
 const publicClient = createPublicClient({
   chain: base,
-  transport: http(),
+  transport: http('https://mainnet.base.org'),
+  batch: {
+    multicall: true,
+  },
 });
 
-/**
- * Custom hook untuk fetch wallet balance
- * @param {string} address - Wallet address
- * @param {number} decimals - Jumlah desimal (default: 4)
- * @returns {Object} - { balance, isLoading, error, refetch, rawBalance }
- */
-const useWalletBalance = (address, decimals = 4) => {
-  const [balance, setBalance] = useState(null);
-  const [rawBalance, setRawBalance] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+// Cache untuk balance
+const balanceCache = new Map();
 
-  const fetchBalance = useCallback(async () => {
+/**
+ * Hook untuk fetch wallet balance dengan real-time updates
+ * @param {string} address - Wallet address
+ * @param {number} decimals - Decimal places
+ * @returns {Object}
+ */
+const useWalletBalance = (address, decimals = DEFAULT_DECIMALS) => {
+  const [balance, setBalance] = useState(() => {
+    // Initialize dari cache jika ada
+    const cached = balanceCache.get(address);
+    return cached?.formatted || null;
+  });
+  const [rawBalance, setRawBalance] = useState(() => {
+    const cached = balanceCache.get(address);
+    return cached?.raw || null;
+  });
+  const [isLoading, setIsLoading] = useState(!balanceCache.has(address));
+  const [error, setError] = useState(null);
+  const mountedRef = useRef(true);
+  const intervalRef = useRef(null);
+
+  const fetchBalance = useCallback(async (showLoading = false) => {
     if (!address) {
       setBalance(null);
       setRawBalance(null);
+      setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
+    if (showLoading) setIsLoading(true);
     setError(null);
 
     try {
       const balanceWei = await publicClient.getBalance({ address });
-      const balanceInEth = formatEther(balanceWei);
-      
-      // Store raw balance
-      setRawBalance(balanceInEth);
-      
-      // Format dengan utility function
-      const formattedBalance = formatEthBalance(balanceInEth, decimals);
-      setBalance(formattedBalance);
+      const balanceEth = formatEther(balanceWei);
+      const formatted = formatEthBalance(balanceEth, decimals);
+
+      // Update cache
+      balanceCache.set(address, { raw: balanceEth, formatted, timestamp: Date.now() });
+
+      if (mountedRef.current) {
+        setRawBalance(balanceEth);
+        setBalance(formatted);
+        setError(null);
+      }
     } catch (err) {
-      console.error('Error fetching balance:', err);
-      setError(err.message);
-      setBalance('0.' + '0'.repeat(decimals));
-      setRawBalance('0');
+      console.error('Balance fetch error:', err);
+      if (mountedRef.current) {
+        setError(err.message);
+        // Keep old balance if available
+        if (!balance) {
+          setBalance('0.' + '0'.repeat(decimals));
+          setRawBalance('0');
+        }
+      }
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [address, decimals]);
+  }, [address, decimals, balance]);
 
   useEffect(() => {
-    fetchBalance();
-    const interval = setInterval(fetchBalance, 30000);
-    return () => clearInterval(interval);
+    mountedRef.current = true;
+
+    if (address) {
+      // Fetch immediately
+      fetchBalance(true);
+
+      // Setup polling interval untuk real-time updates
+      intervalRef.current = setInterval(() => {
+        fetchBalance(false); // Silent refresh tanpa loading state
+      }, BALANCE_REFRESH_INTERVAL);
+    }
+
+    return () => {
+      mountedRef.current = false;
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [address]); // Hanya re-run jika address berubah
+
+  // Manual refetch dengan loading indicator
+  const refetch = useCallback(() => {
+    return fetchBalance(true);
   }, [fetchBalance]);
 
-  return useMemo(
-    () => ({
-      balance,        // Formatted balance (string)
-      rawBalance,     // Raw balance (string, full precision)
-      isLoading,
-      error,
-      refetch: fetchBalance,
-    }),
-    [balance, rawBalance, isLoading, error, fetchBalance]
-  );
+  return useMemo(() => ({
+    balance,
+    rawBalance,
+    isLoading,
+    error,
+    refetch,
+  }), [balance, rawBalance, isLoading, error, refetch]);
 };
 
 export default useWalletBalance;
+
+// Export untuk pre-fetch
+export const prefetchBalance = async (address) => {
+  if (!address) return null;
+  try {
+    const balanceWei = await publicClient.getBalance({ address });
+    const balanceEth = formatEther(balanceWei);
+    balanceCache.set(address, { raw: balanceEth, formatted: formatEthBalance(balanceEth, 4), timestamp: Date.now() });
+    return balanceEth;
+  } catch (err) {
+    console.error('Prefetch balance error:', err);
+    return null;
+  }
+};
