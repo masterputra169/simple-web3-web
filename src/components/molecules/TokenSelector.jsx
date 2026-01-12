@@ -1,5 +1,4 @@
 import React, { memo, useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import Text from '../atoms/Text';
 import { ChevronDownIcon } from '../atoms/icons';
 import { BASE_TOKENS } from '../../config/swap';
@@ -14,31 +13,23 @@ const TokenSelector = ({
   disabled = false 
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
-  const buttonRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   const filteredTokens = tokenList.filter(
     token => token.address !== excludeToken?.address
   );
 
-  // Calculate dropdown position
+  // Close dropdown when clicking outside
   useEffect(() => {
-    if (isOpen && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 8,
-        left: rect.left,
-        width: Math.max(rect.width, 200),
-      });
-    }
-  }, [isOpen]);
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
 
-  // Close on scroll
-  useEffect(() => {
     if (isOpen) {
-      const handleScroll = () => setIsOpen(false);
-      window.addEventListener('scroll', handleScroll, true);
-      return () => window.removeEventListener('scroll', handleScroll, true);
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [isOpen]);
 
@@ -47,73 +38,10 @@ const TokenSelector = ({
     setIsOpen(false);
   };
 
-  // Dropdown Portal
-  const dropdown = isOpen && createPortal(
-    <>
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 z-[9998]"
-        onClick={() => setIsOpen(false)}
-      />
-      
-      {/* Dropdown Menu */}
-      <div 
-        className="fixed z-[9999] bg-slate-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
-        style={{
-          top: dropdownPosition.top,
-          left: dropdownPosition.left,
-          width: dropdownPosition.width,
-        }}
-      >
-        <div className="p-2 border-b border-white/10">
-          <Text variant="tiny" color="muted" className="px-2">
-            Select a token
-          </Text>
-        </div>
-        <div className="max-h-64 overflow-y-auto">
-          {filteredTokens.map((token) => (
-            <button
-              key={token.address}
-              onClick={() => handleSelect(token)}
-              className={`
-                w-full flex items-center gap-3 px-4 py-3
-                hover:bg-white/10 transition-colors
-                ${selectedToken?.address === token.address ? 'bg-blue-500/20' : ''}
-              `}
-            >
-              <img 
-                src={token.logoURI} 
-                alt={token.symbol}
-                className="w-8 h-8 rounded-full bg-white/10"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = `https://ui-avatars.com/api/?name=${token.symbol}&background=3b82f6&color=fff&size=32`;
-                }}
-              />
-              <div className="text-left flex-1">
-                <Text variant="body" className="font-semibold">
-                  {token.symbol}
-                </Text>
-                <Text variant="tiny" color="muted">
-                  {token.name}
-                </Text>
-              </div>
-              {selectedToken?.address === token.address && (
-                <div className="w-2 h-2 rounded-full bg-blue-500" />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-    </>,
-    document.body
-  );
-
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       {/* Selected Token Button */}
       <button
-        ref={buttonRef}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         className={`
@@ -150,7 +78,50 @@ const TokenSelector = ({
         />
       </button>
 
-      {dropdown}
+    {/* Dropdown Menu */}
+{isOpen && (
+  <div className="absolute left-full top-0 ml-2 z-50 bg-slate-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden min-w-[200px]">
+          <div className="p-2 border-b border-white/10">
+            <Text variant="tiny" color="muted" className="px-2">
+              Select a token
+            </Text>
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            {filteredTokens.map((token) => (
+              <button
+                key={token.address}
+                onClick={() => handleSelect(token)}
+                className={`
+                  w-full flex items-center gap-3 px-4 py-3
+                  hover:bg-white/10 transition-colors
+                  ${selectedToken?.address === token.address ? 'bg-blue-500/20' : ''}
+                `}
+              >
+                <img 
+                  src={token.logoURI} 
+                  alt={token.symbol}
+                  className="w-8 h-8 rounded-full bg-white/10"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = `https://ui-avatars.com/api/?name=${token.symbol}&background=3b82f6&color=fff&size=32`;
+                  }}
+                />
+                <div className="text-left flex-1">
+                  <Text variant="body" className="font-semibold">
+                    {token.symbol}
+                  </Text>
+                  <Text variant="tiny" color="muted">
+                    {token.name}
+                  </Text>
+                </div>
+                {selectedToken?.address === token.address && (
+                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

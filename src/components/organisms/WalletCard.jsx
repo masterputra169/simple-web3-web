@@ -24,17 +24,16 @@ const WalletCard = ({
             <Text variant="tiny" color="success">Live</Text>
           </div>
         </div>
-        <Button
-          onClick={onRefresh}
-          variant="ghost"
-          size="sm"
-          loading={isLoading}
-          disabled={isLoading}
-          title="Force refresh"
-        >
-          <RefreshIcon size={16} className={`mx-auto ${isLoading ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">Refresh</span>
-        </Button>
+                    <Button
+            onClick={onRefresh}
+            variant="ghost"
+            size="sm"
+            disabled={isLoading}
+            title="Force refresh"
+            >
+            <RefreshIcon size={16} className={isLoading ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">Refresh</span>
+            </Button>
       </div>
 
       {/* Wallet Info */}

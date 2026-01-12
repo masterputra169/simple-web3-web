@@ -28,7 +28,7 @@ const SwapPage = () => {
   const { authenticated, login } = usePrivy();
 
   return (
-    <div className="min-h-[calc(100vh-180px)] py-8">
+    <div className="min-h-[calc(100vh-180px)] py-6">
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="max-w-lg mx-auto mb-8">
